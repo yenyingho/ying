@@ -65,7 +65,7 @@
     width: 100%; height: 260px; flex-shrink: 0;
     background: #0a0a1a; position: relative; overflow: hidden;
   }
-  #sv-frame { width: 100%; height: 100%; border: none; display: block; }
+  #sv-pano { width: 100%; height: 100%; }
   #sv-loading {
     position: absolute; inset: 0; display: flex;
     align-items: center; justify-content: center;
@@ -171,10 +171,13 @@
   <div id="main">
     <div id="hint-panel">
       <div id="sv-container">
-        <iframe id="sv-frame" src="" allowfullscreen></iframe>
+        <div id="sv-pano"></div>
         <div id="sv-loading">
           <div class="spin">🗺️</div>
           <div>載入街景中…</div>
+        </div>
+        <div id="sv-error" style="display:none;position:absolute;inset:0;background:#0a0a1a;display:none;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:#666;font-size:0.85em">
+          <div style="font-size:2em">📷</div><div>此處暫無街景</div>
         </div>
       </div>
       <div id="hint-info">
@@ -298,12 +301,71 @@ let timerInterval=null, timeLeft=TIME_LIMIT, timedOut=false;
 
 function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 
-function loadStreetView(store){
-  const frame=document.getElementById('sv-frame');
-  const loading=document.getElementById('sv-loading');
-  loading.style.opacity='1';
-  frame.src=`https://www.google.com/maps/embed/v1/streetview?key=${GMAPS_KEY}&location=${store.lat},${store.lng}&fov=90&pitch=0`;
-  frame.onload=()=>{ loading.style.opacity='0'; };
+let panorama = null;
+
+function loadStreetView(store) {
+  const loading = document.getElementById('sv-loading');
+  const errEl = document.getElementById('sv-error');
+  loading.style.opacity = '1';
+  loading.style.display = 'flex';
+  errEl.style.display = 'none';
+
+  const svService = new google.maps.StreetViewService();
+  const storeLatLng = new google.maps.LatLng(store.lat, store.lng);
+
+  svService.getPanorama({ location: storeLatLng, radius: 50, preference: google.maps.StreetViewPreference.NEAREST }, (data, status) => {
+    if (status === google.maps.StreetViewStatus.OK) {
+      const panoLatLng = data.location.latLng;
+
+      // 計算街景點朝向店面的角度
+      const heading = google.maps.geometry.spherical.computeHeading(panoLatLng, storeLatLng);
+
+      if (!panorama) {
+        panorama = new google.maps.StreetViewPanorama(document.getElementById('sv-pano'), {
+          pano: data.location.pano,
+          pov: { heading: heading, pitch: 0 },
+          zoom: 1,
+          addressControl: false,
+          fullscreenControl: false,
+          motionTracking: false,
+          motionTrackingControl: false,
+          showRoadLabels: false,
+        });
+      } else {
+        panorama.setPano(data.location.pano);
+        panorama.setPov({ heading: heading, pitch: 0 });
+      }
+
+      loading.style.opacity = '0';
+      setTimeout(() => { loading.style.display = 'none'; }, 500);
+    } else {
+      // 找不到街景，擴大搜尋範圍再試一次
+      svService.getPanorama({ location: storeLatLng, radius: 200 }, (data2, status2) => {
+        loading.style.display = 'none';
+        if (status2 === google.maps.StreetViewStatus.OK) {
+          const panoLatLng = data2.location.latLng;
+          const heading = google.maps.geometry.spherical.computeHeading(panoLatLng, storeLatLng);
+          if (!panorama) {
+            panorama = new google.maps.StreetViewPanorama(document.getElementById('sv-pano'), {
+              pano: data2.location.pano,
+              pov: { heading: heading, pitch: 0 },
+              zoom: 1,
+              addressControl: false,
+              fullscreenControl: false,
+              motionTracking: false,
+              motionTrackingControl: false,
+              showRoadLabels: false,
+            });
+          } else {
+            panorama.setPano(data2.location.pano);
+            panorama.setPov({ heading: heading, pitch: 0 });
+          }
+        } else {
+          errEl.style.display = 'flex';
+        }
+      });
+    }
+  });
 }
 
 function startGame(){
@@ -477,6 +539,6 @@ function restartGame(){
 }
 </script>
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAo6pRK4R9R1GRrq3smv6PbICQde-frmSs&callback=Function.prototype" async defer></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAo6pRK4R9R1GRrq3smv6PbICQde-frmSs&libraries=geometry&callback=Function.prototype" async defer></script>
 </body>
 </html>
