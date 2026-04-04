@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台灣雙醬咖哩 藏飽圖</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Arial', sans-serif; background: #1a1a2e; color: #fff; height: 100vh; overflow: hidden; }
+
+  #splash {
+    position: fixed; inset: 0;
+    background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 1000; gap: 20px;
+  }
+  #splash h1 { font-size: 2.5em; color: #f5a623; text-shadow: 0 0 20px rgba(245,166,35,0.5); text-align: center; }
+  #splash p { color: #aaa; font-size: 1.1em; text-align: center; max-width: 400px; line-height: 1.6; }
+
+  .btn {
+    background: linear-gradient(135deg, #f5a623, #e8890a);
+    color: #1a1a2e; border: none; padding: 14px 36px;
+    font-size: 1.1em; font-weight: bold; border-radius: 30px;
+    cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 20px rgba(245,166,35,0.4);
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 25px rgba(245,166,35,0.6); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  #game { display: none; height: 100vh; flex-direction: column; }
+  #game.active { display: flex; }
+
+  #header {
+    background: rgba(0,0,0,0.85); padding: 10px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 2px solid #f5a623; flex-shrink: 0; gap: 12px;
+  }
+  #header h2 { color: #f5a623; font-size: 1em; white-space: nowrap; }
+  #score-display { display: flex; gap: 16px; align-items: center; }
+  .stat { text-align: center; }
+  .stat .val { font-size: 1.3em; font-weight: bold; color: #f5a623; }
+  .stat .lbl { font-size: 0.65em; color: #aaa; }
+
+  #timer-wrap {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.07); border-radius: 20px; padding: 6px 14px;
+  }
+  #timer-num {
+    font-size: 1.4em; font-weight: bold; color: #4ecdc4;
+    font-variant-numeric: tabular-nums; min-width: 32px; text-align: center;
+  }
+  #timer-num.warn { color: #e74c3c; animation: pulse 0.6s infinite alternate; }
+  @keyframes pulse { from { opacity: 1; } to { opacity: 0.4; } }
+  #timer-bar-wrap { width: 90px; height: 6px; background: #333; border-radius: 3px; }
+  #timer-bar { height: 100%; border-radius: 3px; background: #4ecdc4; transition: width 1s linear, background 0.3s; }
+
+  #main { display: flex; flex: 1; overflow: hidden; }
+
+  #hint-panel {
+    width: 340px; background: #16213e;
+    display: flex; flex-direction: column;
+    border-right: 1px solid #0f3460; flex-shrink: 0; overflow: hidden;
+  }
+  #sv-container {
+    width: 100%; height: 260px; flex-shrink: 0;
+    background: #0a0a1a; position: relative; overflow: hidden;
+  }
+  #sv-frame { width: 100%; height: 100%; border: none; display: block; }
+  #sv-loading {
+    position: absolute; inset: 0; display: flex;
+    align-items: center; justify-content: center;
+    background: #0a0a1a; color: #666; font-size: 0.85em;
+    flex-direction: column; gap: 8px;
+    transition: opacity 0.5s;
+  }
+  #sv-loading .spin { font-size: 2em; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #hint-info {
+    padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; flex: 1; overflow-y: auto;
+  }
+  #hint-info h3 { color: #f5a623; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; }
+  #hint-text {
+    color: #ddd; font-size: 0.9em; line-height: 1.7;
+    background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px;
+  }
+  #timeout-notice {
+    display: none; color: #e74c3c; font-size: 0.85em;
+    background: rgba(231,76,60,0.12); border: 1px solid rgba(231,76,60,0.35);
+    padding: 8px 12px; border-radius: 6px; text-align: center;
+  }
+  #timeout-notice.show { display: block; }
+
+  #map-container { flex: 1; position: relative; }
+  #map { width: 100%; height: 100%; }
+  #guess-btn-wrap {
+    position: absolute; bottom: 20px; left: 20px; z-index: 500;
+  }
+
+  #result-overlay {
+    display: none; position: fixed;
+    bottom: 24px; right: 24px; z-index: 900;
+  }
+  #result-overlay.show { display: block; }
+  #result-card {
+    background: rgba(22,33,62,0.96); border: 2px solid #f5a623;
+    border-radius: 16px; padding: 18px 22px; width: 280px;
+    text-align: center; box-shadow: 0 4px 30px rgba(0,0,0,0.6);
+    backdrop-filter: blur(6px);
+  }
+  #result-icon { font-size: 2em; margin-bottom: 4px; }
+  #result-title { font-size: 1.2em; font-weight: bold; margin-bottom: 4px; }
+  #result-store { color: #f5a623; font-size: 0.85em; margin-bottom: 4px; }
+  #result-dist { color: #aaa; font-size: 0.82em; margin-bottom: 10px; min-height: 1em; }
+  #result-pts { font-size: 1.7em; font-weight: bold; color: #4ecdc4; margin-bottom: 14px; }
+  #result-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .link-btn {
+    background: transparent; border: 2px solid #f5a623; color: #f5a623;
+    padding: 10px 20px; border-radius: 20px; cursor: pointer;
+    font-size: 0.9em; text-decoration: none; display: inline-block;
+    transition: background 0.2s;
+  }
+  .link-btn:hover { background: rgba(245,166,35,0.15); }
+
+  #final-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.9); z-index: 950;
+    align-items: center; justify-content: center;
+  }
+  #final-overlay.show { display: flex; }
+  #final-card {
+    background: #16213e; border: 2px solid #f5a623;
+    border-radius: 16px; padding: 40px; max-width: 440px; width: 90%;
+    text-align: center;
+  }
+  #final-card h2 { color: #f5a623; font-size: 1.8em; margin-bottom: 8px; }
+  #final-score { font-size: 3em; font-weight: bold; color: #4ecdc4; margin: 14px 0; }
+  #final-breakdown { color: #aaa; font-size: 0.9em; margin-bottom: 8px; }
+  #final-msg { color: #ddd; font-size: 1em; margin-bottom: 20px; }
+
+  #progress-bar { background: #0f3460; border-radius: 4px; height: 6px; }
+  #progress-fill { background: linear-gradient(90deg, #f5a623, #4ecdc4); height: 100%; border-radius: 4px; transition: width 0.4s; }
+  #round-indicator { color: #666; font-size: 0.78em; text-align: right; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <div style="font-size:3em">🍛</div>
+  <h1>台灣雙醬咖哩<br>藏飽圖</h1>
+  <p>61 間門市藏在台灣各地<br>看街景猜位置，3公里內算成功！</p>
+  <div style="color:#888;font-size:0.85em">共 3 關・每關限時 45 秒・最高 1000 分</div>
+  <button class="btn" onclick="startGame()">開始挑戰 🗺️</button>
+</div>
+
+<div id="game">
+  <div id="header">
+    <h2>🍛 雙醬咖哩藏飽圖</h2>
+    <div id="timer-wrap">
+      <span style="font-size:0.75em;color:#aaa">⏱</span>
+      <div id="timer-num">0:45</div>
+      <div id="timer-bar-wrap"><div id="timer-bar" style="width:100%"></div></div>
+    </div>
+    <div id="score-display">
+      <div class="stat"><div class="val" id="cur-round">1</div><div class="lbl">關卡</div></div>
+      <div class="stat"><div class="val" id="cur-score">0</div><div class="lbl">總分</div></div>
+      <div class="stat"><div class="val" id="cur-success">0</div><div class="lbl">成功</div></div>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="hint-panel">
+      <div id="sv-container">
+        <iframe id="sv-frame" src="" allowfullscreen></iframe>
+        <div id="sv-loading">
+          <div class="spin">🗺️</div>
+          <div>載入街景中…</div>
+        </div>
+      </div>
+      <div id="hint-info">
+        <h3>🔍 線索</h3>
+        <div id="hint-text">載入中…</div>
+        <div id="timeout-notice">⏰ 時間到！</div>
+        <div style="margin-top:auto;">
+          <div id="progress-bar"><div id="progress-fill" style="width:0%"></div></div>
+          <div id="round-indicator">第 1 / 3 關</div>
+          <div style="color:#555;font-size:0.75em;margin-top:8px">點擊地圖選擇位置，再按送出</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="map-container">
+      <div id="map"></div>
+      <div id="guess-btn-wrap">
+        <button class="btn" id="guess-btn" onclick="submitGuess(false)" disabled>📍 送出答案</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="result-overlay">
+  <div id="result-card">
+    <div id="result-icon"></div>
+    <div id="result-title"></div>
+    <div id="result-store"></div>
+    <div id="result-dist"></div>
+    <div id="result-pts"></div>
+    <div id="result-btns">
+      <a id="street-link" class="link-btn" href="#" target="_blank" style="display:none">🗺️ 查看位置</a>
+      <button class="btn" id="next-btn" onclick="nextRound()">下一關 →</button>
+    </div>
+  </div>
+</div>
+
+<div id="final-overlay">
+  <div id="final-card">
+    <div style="font-size:2.5em">🍛</div>
+    <h2>挑戰結束！</h2>
+    <div id="final-score"></div>
+    <div id="final-breakdown"></div>
+    <div id="final-msg"></div>
+    <button class="btn" onclick="restartGame()">再玩一次 🔄</button>
+  </div>
+</div>
+
+<script>
+const GMAPS_KEY = 'AIzaSyAo6pRK4R9R1GRrq3smv6PbICQde-frmSs';
+const TOTAL_ROUNDS = 3;
+const TIME_LIMIT = 45;
+
+const STORES = [
+  {name:"雙醬咖哩-吳鳳店",city:"嘉義市",lat:23.4583734042461,lng:120.458592476427,url:"https://maps.app.goo.gl/c3S3uHsqRvAT3EjG7"},
+  {name:"雙醬咖哩-潭子店",city:"台中市",lat:24.2061985588049,lng:120.704616078066,url:"https://maps.app.goo.gl/z3HfHzjGqEyxiWT49"},
+  {name:"雙醬咖哩 后里甲后店",city:"台中市",lat:24.3129211596023,lng:120.723414072078,url:"https://maps.app.goo.gl/hMkHpJkZt2cWR9NK8"},
+  {name:"雙醬咖哩-竹崎店",city:"嘉義縣",lat:23.5204033307398,lng:120.548784656174,url:"https://maps.app.goo.gl/xWTEkTFgof3fiWPq8"},
+  {name:"Nice nine 雙醬咖哩 斗南文元店",city:"雲林縣",lat:23.6787305081499,lng:120.479479356174,url:"https://maps.app.goo.gl/i5TpeuBpFqfiq4ej6"},
+  {name:"雙醬咖哩新豐店",city:"新竹縣",lat:24.874585502298,lng:120.994305263,url:"https://maps.app.goo.gl/6eJxVoDPrwhydCyp8"},
+  {name:"雙醬咖哩霧峰店",city:"台中市",lat:24.0694041634637,lng:120.697540272078,url:"https://maps.app.goo.gl/VzAFaWmncso7Zowv6"},
+  {name:"雙醬咖喱-苗栗店",city:"苗栗縣",lat:24.5533354023176,lng:120.815059149347,url:"https://maps.app.goo.gl/Q7oa3gHt3xpvfX3c8"},
+  {name:"雙醬咖哩-屏東東港店",city:"屏東縣",lat:22.4751907278612,lng:120.459880572078,url:"https://maps.app.goo.gl/PkbYVS8iY8GBYdzz5"},
+  {name:"雙醬咖哩-台中神岡店",city:"台中市",lat:24.2499416137613,lng:120.681378172078,url:"https://maps.app.goo.gl/sMdJHQFcqs7MsfHN8"},
+  {name:"台灣雙醬咖哩 北斗中華店",city:"彰化縣",lat:23.8761722204735,lng:120.518603072078,url:"https://maps.app.goo.gl/nUkRWJCXPG9BgHi6A"},
+  {name:"雙醬咖哩-觀音建國店",city:"桃園市",lat:25.0542010696664,lng:121.121838572078,url:"https://maps.app.goo.gl/u4aRrwDAj2X26Vhg7"},
+  {name:"雙醬咖哩－永和安樂店",city:"新北市",lat:25.00523920471,lng:121.515567678904,url:"https://maps.app.goo.gl/4KfbMp6dycbfsdE99"},
+  {name:"雙醬咖哩宜蘭店",city:"宜蘭縣",lat:24.7633177684151,lng:121.752980403886,url:"https://maps.app.goo.gl/VJNrN7GTgvxxW1939"},
+  {name:"雙醬咖哩",city:"宜蘭縣",lat:24.6754761029861,lng:121.772809249347,url:"https://maps.app.goo.gl/p4a5w3cDnUjSYeak6"},
+  {name:"雙醬咖哩-前鎮瑞和店",city:"高雄市",lat:22.6097697102733,lng:120.328014472078,url:"https://maps.app.goo.gl/2RNVK5mS11gJLRNP9"},
+  {name:"Nice Nine 雙醬咖哩",city:"嘉義縣",lat:23.5604708445535,lng:120.471174533443,url:"https://maps.app.goo.gl/D1XW1xSVUGmSmy6j8"},
+  {name:"雙醬咖哩-高雄路竹店",city:"高雄市",lat:22.8688135055943,lng:120.263936133443,url:"https://maps.app.goo.gl/efKpRS78454ADRti6"},
+  {name:"雙醬咖哩-小港桂林店",city:"高雄市",lat:22.584436734893,lng:120.360254656174,url:"https://maps.app.goo.gl/jmKiFhT7dAxNiuGs9"},
+  {name:"雙醬咖哩台南中正店（南應大）",city:"台南市",lat:23.042330651585,lng:120.239307642521,url:"https://maps.app.goo.gl/pEcPpRHMWQXe57R86"},
+  {name:"雙醬咖哩－虎尾店",city:"雲林縣",lat:23.7075035244335,lng:120.429251572078,url:"https://maps.app.goo.gl/vQXTNjnBy9q56wkB7"},
+  {name:"雙醬咖哩西勢富強店",city:"台南市",lat:23.0247006362933,lng:120.274644849347,url:"https://maps.app.goo.gl/wqDVYBMoU6bDqMoc9"},
+  {name:"雙醬咖哩 - 新市店",city:"台南市",lat:23.023910702994,lng:120.275331494809,url:"https://maps.app.goo.gl/iSTK9DcRFzcR6LmB7"},
+  {name:"雙醬咖哩 南投水里店",city:"南投縣",lat:23.8185254216972,lng:120.853056056174,url:"https://maps.app.goo.gl/zDtfyXNfiVbuhXzE8"},
+  {name:"Nice Nine 雙醬咖哩（新營店）",city:"台南市",lat:23.3109929438927,lng:120.313331156174,url:"https://maps.app.goo.gl/ni9Qo4wCGdn5n1om7"},
+  {name:"雙醬咖哩 東華大學店",city:"花蓮縣",lat:23.9082466004194,lng:121.532090394809,url:"https://maps.app.goo.gl/RhVmyQfcuwoJau7i6"},
+  {name:"雙醬咖哩-屏科大店",city:"屏東縣",lat:22.6449123451021,lng:120.594519849347,url:"https://maps.app.goo.gl/aqbbtPEVErNzTs5X9"},
+  {name:"雙醬咖哩-屏東潮州店",city:"屏東縣",lat:22.5469450438993,lng:120.549208333443,url:"https://maps.app.goo.gl/Xb1vY1XucF1t5hJG7"},
+  {name:"雙醬咖哩-北港店",city:"雲林縣",lat:23.5780686508787,lng:120.299962033443,url:"https://maps.app.goo.gl/czHwVyXJkx1H19SB8"},
+  {name:"雙醬咖哩",city:"台中市",lat:24.1456798808037,lng:120.732992694809,url:"https://maps.app.goo.gl/a5Z1VFS8mdmDtrVX8"},
+  {name:"雙醬咖喱-東山店",city:"台中市",lat:24.1787271596795,lng:120.715654896917,url:"https://maps.app.goo.gl/cESaGRi52xbinctj7"},
+  {name:"雙醬咖哩",city:"苗栗縣",lat:24.5718581112318,lng:120.760786553365,url:"https://maps.app.goo.gl/9Rhpv2d7hUM3ftVt8"},
+  {name:"雙醬咖哩草屯店",city:"南投縣",lat:23.9855899980543,lng:120.685882989618,url:"https://maps.app.goo.gl/J5wMttboeVhhw6d3A"},
+  {name:"雙醬咖哩 忠孝興大店",city:"台中市",lat:24.134697299358,lng:120.680074589618,url:"https://maps.app.goo.gl/PCt7AZ64uZVWzekb6"},
+  {name:"雙醬咖哩台中精明店",city:"台中市",lat:24.1632054923607,lng:120.654668707559,url:"https://maps.app.goo.gl/ugqgtfNujy9HrBZE9"},
+  {name:"雙醬咖喱昌平店",city:"台中市",lat:24.1722891842958,lng:120.693807498839,url:"https://maps.app.goo.gl/FcBb1mb1sBjHQz4Q6"},
+  {name:"雙醬咖哩、焦糖烤布蕾",city:"彰化縣",lat:23.9631530392665,lng:120.573648044157,url:"https://maps.app.goo.gl/AYLDeaCoYjJRFq7z6"},
+  {name:"雙醬咖哩彰化和美店",city:"彰化縣",lat:24.1189759421692,lng:120.494593844157,url:"https://maps.app.goo.gl/vEDhRWJmH646PTts7"},
+  {name:"台灣雙醬咖哩員林店",city:"彰化縣",lat:23.9704095300989,lng:120.568105189618,url:"https://maps.app.goo.gl/YtZeXkAm2tpSvfnf7"},
+  {name:"台灣雙醬咖喱 台中美村店",city:"台中市",lat:24.1570802250758,lng:120.660793144156,url:"https://maps.app.goo.gl/5johezvFcnV1gyq36"},
+  {name:"雙醬咖哩(金山店)",city:"新竹市",lat:24.7823737158735,lng:121.020681212348,url:"https://maps.app.goo.gl/U3bn7oExYVKwyw1s5"},
+  {name:"台灣雙醬咖哩（新竹北門店）",city:"新竹市",lat:24.8150984178616,lng:120.966092898195,url:"https://maps.app.goo.gl/DohBykXpAMLnydSa6"},
+  {name:"雙醬咖哩(苗栗頭份店)",city:"苗栗縣",lat:24.695161321096,lng:120.902048121426,url:"https://maps.app.goo.gl/MgLMQpA9qMuoBrso7"},
+  {name:"雙醬咖哩雙溪店",city:"新竹縣",lat:24.7695277750539,lng:120.988215930936,url:"https://maps.app.goo.gl/3v8qaAk4RM5SYKd26"},
+  {name:"雙醬咖哩向上店",city:"台中市",lat:24.1530953465011,lng:120.637260744157,url:"https://maps.app.goo.gl/6f4mwJ4FvyfBcS496"},
+  {name:"雙醬咖哩 - 中壢華美店",city:"桃園市",lat:24.9512631338209,lng:121.258750044157,url:"https://maps.app.goo.gl/5VUWZyyFEaC2B2zD9"},
+  {name:"雙醬咖哩-汐止忠孝店",city:"新北市",lat:25.0777248759811,lng:121.664745698695,url:"https://maps.app.goo.gl/vSbhvHVX79eLRaVd6"},
+  {name:"雙醬咖喱(松山饒河店)",city:"台北市",lat:25.0568888531179,lng:121.576511756951,url:"https://maps.app.goo.gl/smioaYRCdLYXriqL6"},
+  {name:"基隆雙醬咖哩 大武崙店",city:"基隆市",lat:25.1448735768829,lng:121.709720976394,url:"https://maps.app.goo.gl/rXVfXTffDKvxNUev9"},
+  {name:"台灣雙醬咖哩三峽復興店",city:"新北市",lat:24.9438822380926,lng:121.374048666887,url:"https://maps.app.goo.gl/hw8NHd4cW9ZrkyGQ9"},
+  {name:"台灣雙醬咖哩蘇澳店",city:"宜蘭縣",lat:24.6034848759675,lng:121.844426098695,url:"https://maps.app.goo.gl/YYWS8yJaxf4LMCEZA"},
+  {name:"雙醬咖哩 新竹中央店",city:"新竹市",lat:24.8181231133046,lng:120.981947957809,url:"https://maps.app.goo.gl/WYsBFPLKWVhwv4du9"},
+  {name:"雙醬咖哩 忠順店",city:"台北市",lat:24.9903515696728,lng:121.558841244157,url:"https://maps.app.goo.gl/SAAbRVBKaXw4ab6p9"},
+  {name:"雙醬咖哩桃園愛買中山店",city:"桃園市",lat:24.9940193755986,lng:121.282409021426,url:"https://maps.app.goo.gl/pzLLRJCQQTnwgeRr5"},
+  {name:"雙醬咖哩（中和新生街）",city:"新北市",lat:25.0087080636601,lng:121.482873544157,url:"https://maps.app.goo.gl/L7pfqVWVVttoJER17"},
+  {name:"雙醬咖哩 台北小巨蛋店",city:"台北市",lat:25.058790421455,lng:121.546731572034,url:"https://maps.app.goo.gl/oqCEmDNFQwGTHhE18"},
+  {name:"雙醬咖哩樹林保安店",city:"新北市",lat:25.0077746580426,lng:121.414208998052,url:"https://maps.app.goo.gl/avvKvsmj5ixemQ1S8"},
+  {name:"雙醬咖哩華新街中和店",city:"新北市",lat:24.992528029002,lng:121.511026008059,url:"https://maps.app.goo.gl/G8aq6iEpbtF85rY27"},
+  {name:"雙醬咖喱板橋莊敬店",city:"新北市",lat:25.0273746861203,lng:121.472573862241,url:"https://maps.app.goo.gl/pwxH2nSNJN6xQ37EA"},
+  {name:"台灣雙醬咖哩-三重文化北店",city:"新北市",lat:25.0727849387826,lng:121.49832306703,url:"https://maps.app.goo.gl/2hCURizdYFXgx2YPA"},
+  {name:"雙醬咖哩三重正義店",city:"新北市",lat:25.0699861632182,lng:121.498666389761,url:"https://maps.app.goo.gl/7TfBHrmH2MrmuRy39"}
+];
+
+let gameStores=[], currentRound=0, totalScore=0, successCount=0;
+let selectedLatLng=null, map=null, infoWindow=null, guessMarker=null, answerMarker=null, polyline=null;
+let timerInterval=null, timeLeft=TIME_LIMIT, timedOut=false;
+
+function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+function loadStreetView(store){
+  const frame=document.getElementById('sv-frame');
+  const loading=document.getElementById('sv-loading');
+  loading.style.opacity='1';
+  frame.src=`https://www.google.com/maps/embed/v1/streetview?key=${GMAPS_KEY}&location=${store.lat},${store.lng}&fov=90&pitch=0`;
+  frame.onload=()=>{ loading.style.opacity='0'; };
+}
+
+function startGame(){
+  document.getElementById('splash').style.display='none';
+  document.getElementById('game').classList.add('active');
+  gameStores=shuffle(STORES).slice(0,TOTAL_ROUNDS);
+  currentRound=0;totalScore=0;successCount=0;
+  initMap();loadRound();
+}
+
+function initMap(){
+  map=new google.maps.Map(document.getElementById('map'),{
+    center:{lat:23.8,lng:121.0}, zoom:7,
+    mapTypeId:'roadmap',
+    streetViewControl:false,
+    fullscreenControl:false,
+    mapTypeControl:false,
+  });
+  infoWindow=new google.maps.InfoWindow();
+  map.addListener('click',(e)=>onMapClick(e.latLng));
+}
+
+function loadRound(){
+  if(guessMarker){guessMarker.setMap(null);guessMarker=null;}
+  if(answerMarker){answerMarker.setMap(null);answerMarker=null;}
+  if(polyline){polyline.setMap(null);polyline=null;}
+  if(infoWindow)infoWindow.close();
+  selectedLatLng=null;timedOut=false;
+  document.getElementById('guess-btn').disabled=true;
+  document.getElementById('timeout-notice').classList.remove('show');
+
+  const s=gameStores[currentRound];
+  loadStreetView(s);
+  document.getElementById('hint-text').innerHTML=
+    `<strong>🍛 這間雙醬咖哩在哪裡？</strong><br><br>`+
+    `📍 位於 <strong style="color:#f5a623;font-size:1.1em">${s.city}</strong><br><br>`+
+    `<span style="color:#666;font-size:0.85em">觀察街景的環境、招牌、建築來判斷位置</span>`;
+
+  document.getElementById('cur-round').textContent=currentRound+1;
+  document.getElementById('cur-score').textContent=totalScore;
+  document.getElementById('cur-success').textContent=successCount;
+  document.getElementById('progress-fill').style.width=((currentRound/TOTAL_ROUNDS)*100)+'%';
+  document.getElementById('round-indicator').textContent=`第 ${currentRound+1} / ${TOTAL_ROUNDS} 關`;
+  map.setCenter({lat:23.8,lng:121.0});map.setZoom(7);
+  startTimer();
+}
+
+function startTimer(){
+  clearInterval(timerInterval);
+  timeLeft=TIME_LIMIT;updateTimerDisplay();
+  timerInterval=setInterval(()=>{
+    timeLeft--;updateTimerDisplay();
+    if(timeLeft<=0){clearInterval(timerInterval);timedOut=true;document.getElementById('timeout-notice').classList.add('show');submitGuess(true);}
+  },1000);
+}
+
+function updateTimerDisplay(){
+  const m=Math.floor(timeLeft/60),s=timeLeft%60;
+  const el=document.getElementById('timer-num');
+  el.textContent=`${m}:${s.toString().padStart(2,'0')}`;
+  el.classList.toggle('warn',timeLeft<=10);
+  const pct=(timeLeft/TIME_LIMIT)*100;
+  const bar=document.getElementById('timer-bar');
+  bar.style.width=pct+'%';
+  bar.style.background=timeLeft<=10?'#e74c3c':timeLeft<=20?'#f39c12':'#4ecdc4';
+}
+
+function onMapClick(latLng){
+  if(timedOut)return;
+  selectedLatLng=latLng;
+  if(guessMarker)guessMarker.setMap(null);
+  guessMarker=new google.maps.Marker({
+    position:latLng, map:map,
+    icon:{path:google.maps.SymbolPath.CIRCLE, scale:10, fillColor:'#f5a623', fillOpacity:1, strokeColor:'#fff', strokeWeight:3},
+    title:'你的猜測'
+  });
+  document.getElementById('guess-btn').disabled=false;
+}
+
+function calcDist(lat1,lng1,lat2,lng2){
+  const R=6371000,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function calcScore(d){
+  if(d<=3000)return Math.round(1000-(d/3000)*500);
+  if(d<=50000)return Math.round(Math.max(0,500-((d-3000)/47000)*500));
+  return 0;
+}
+
+function submitGuess(isTimeout){
+  clearInterval(timerInterval);
+  document.getElementById('guess-btn').disabled=true;
+  const store=gameStores[currentRound];
+  let dist,pts,success;
+
+  if(!selectedLatLng){
+    dist=null;pts=0;success=false;
+  }else{
+    dist=calcDist(selectedLatLng.lat(),selectedLatLng.lng(),store.lat,store.lng);
+    pts=calcScore(dist);success=dist<=3000;
+  }
+  if(success)successCount++;
+  totalScore+=pts;
+
+  // Answer marker
+  answerMarker=new google.maps.Marker({
+    position:{lat:store.lat,lng:store.lng}, map:map,
+    icon:{url:'https://maps.google.com/mapfiles/ms/icons/orange-dot.png'},
+    title:store.name
+  });
+  infoWindow.setContent(`<div style="font-weight:bold;color:#333">${store.name}</div>`);
+  infoWindow.open(map,answerMarker);
+
+  if(selectedLatLng){
+    polyline=new google.maps.Polyline({
+      path:[selectedLatLng,{lat:store.lat,lng:store.lng}],
+      strokeColor:success?'#4ecdc4':'#e74c3c',
+      strokeOpacity:0.85, strokeWeight:3,
+      icons:[{icon:{path:'M 0,-1 0,1',strokeOpacity:1,scale:3},offset:'0',repeat:'12px'}],
+      map:map
+    });
+    const bounds=new google.maps.LatLngBounds();
+    bounds.extend(selectedLatLng);bounds.extend({lat:store.lat,lng:store.lng});
+    map.fitBounds(bounds,{padding:60});
+  }else{
+    map.setCenter({lat:store.lat,lng:store.lng});map.setZoom(14);
+  }
+
+  const distText=dist===null?'未作答':dist>=1000?`${(dist/1000).toFixed(1)} 公里`:`${Math.round(dist)} 公尺`;
+  document.getElementById('result-icon').textContent=success?'🎉':dist===null?'⏰':'😅';
+  document.getElementById('result-title').textContent=success?'答對了！':dist===null?'時間到，未作答':'差一點～';
+  document.getElementById('result-store').textContent=`📍 ${store.name}`;
+  document.getElementById('result-dist').textContent=dist===null?'':`距離正確位置 ${distText}`;
+  document.getElementById('result-pts').textContent=`+${pts} 分`;
+
+  const linkEl=document.getElementById('street-link');
+  if(store.url&&store.url.startsWith('http')){linkEl.href=store.url;linkEl.style.display='inline-block';}
+  else{linkEl.style.display='none';}
+
+  document.getElementById('next-btn').textContent=currentRound+1>=TOTAL_ROUNDS?'查看結果 🏆':'下一關 →';
+  document.getElementById('result-overlay').classList.add('show');
+}
+
+function nextRound(){
+  document.getElementById('result-overlay').classList.remove('show');
+  currentRound++;
+  if(currentRound>=TOTAL_ROUNDS)showFinal();else loadRound();
+}
+
+function showFinal(){
+  const pct=totalScore/(TOTAL_ROUNDS*1000);
+  const msg=pct>=0.9?'🏆 你是雙醬咖哩的超級粉絲！':pct>=0.7?'👏 對台灣地理非常熟悉！':pct>=0.4?'😊 不錯喔，繼續加油！':'🍛 多吃幾次就會記住位置了！';
+  document.getElementById('final-score').textContent=`${totalScore} 分`;
+  document.getElementById('final-breakdown').textContent=`${successCount} / ${TOTAL_ROUNDS} 關成功（3公里內）`;
+  document.getElementById('final-msg').textContent=msg;
+  document.getElementById('final-overlay').classList.add('show');
+}
+
+function restartGame(){
+  document.getElementById('final-overlay').classList.remove('show');
+  clearInterval(timerInterval);
+  currentRound=0;totalScore=0;successCount=0;
+  gameStores=shuffle(STORES).slice(0,TOTAL_ROUNDS);
+  if(guessMarker){guessMarker.setMap(null);guessMarker=null;}
+  if(answerMarker){answerMarker.setMap(null);answerMarker=null;}
+  if(polyline){polyline.setMap(null);polyline=null;}
+  if(infoWindow)infoWindow.close();
+  loadRound();
+}
+</script>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAo6pRK4R9R1GRrq3smv6PbICQde-frmSs&callback=Function.prototype" async defer></script>
+</body>
+</html>
