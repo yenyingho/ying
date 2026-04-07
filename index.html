@@ -63,15 +63,17 @@
   }
   #sv-container {
     width: 100%; height: 260px; flex-shrink: 0;
-    background: #0a0a1a; position: relative; overflow: hidden;
+    background: #0a0a1a; position: relative;
   }
-  #sv-pano { width: 100%; height: 100%; }
+  #sv-frame {
+    width: 100%; height: 100%; border: none; display: block;
+  }
   #sv-loading {
     position: absolute; inset: 0; display: flex;
     align-items: center; justify-content: center;
     background: #0a0a1a; color: #666; font-size: 0.85em;
-    flex-direction: column; gap: 8px;
-    transition: opacity 0.5s;
+    flex-direction: column; gap: 8px; transition: opacity 0.5s;
+    pointer-events: none;
   }
   #sv-loading .spin { font-size: 2em; animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -148,7 +150,7 @@
 <div id="splash">
   <div style="font-size:3em">🍛</div>
   <h1>台灣雙醬咖哩<br>藏飽圖</h1>
-  <p>61 間門市藏在台灣各地<br>看街景猜位置，3公里內算成功！</p>
+  <p>59 間門市藏在台灣各地<br>看街景猜位置，3公里內算成功！</p>
   <div style="color:#888;font-size:0.85em">共 3 關・每關限時 45 秒・最高 1000 分</div>
   <button class="btn" onclick="startGame()">開始挑戰 🗺️</button>
 </div>
@@ -171,13 +173,10 @@
   <div id="main">
     <div id="hint-panel">
       <div id="sv-container">
-        <div id="sv-pano"></div>
+        <iframe id="sv-frame" src="about:blank" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
         <div id="sv-loading">
           <div class="spin">🗺️</div>
           <div>載入街景中…</div>
-        </div>
-        <div id="sv-error" style="display:none;position:absolute;inset:0;background:#0a0a1a;display:none;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:#666;font-size:0.85em">
-          <div style="font-size:2em">📷</div><div>此處暫無街景</div>
         </div>
       </div>
       <div id="hint-info">
@@ -227,72 +226,69 @@
 </div>
 
 <script>
-const GMAPS_KEY = 'AIzaSyAo6pRK4R9R1GRrq3smv6PbICQde-frmSs';
 const TOTAL_ROUNDS = 3;
 const TIME_LIMIT = 45;
 
 const STORES = [
-  {name:"雙醬咖哩-吳鳳店",city:"嘉義市",lat:23.4583734042461,lng:120.458592476427,url:"https://maps.app.goo.gl/c3S3uHsqRvAT3EjG7"},
-  {name:"雙醬咖哩-潭子店",city:"台中市",lat:24.2061985588049,lng:120.704616078066,url:"https://maps.app.goo.gl/z3HfHzjGqEyxiWT49"},
-  {name:"雙醬咖哩 后里甲后店",city:"台中市",lat:24.3129211596023,lng:120.723414072078,url:"https://maps.app.goo.gl/hMkHpJkZt2cWR9NK8"},
-  {name:"雙醬咖哩-竹崎店",city:"嘉義縣",lat:23.5204033307398,lng:120.548784656174,url:"https://maps.app.goo.gl/xWTEkTFgof3fiWPq8"},
-  {name:"Nice nine 雙醬咖哩 斗南文元店",city:"雲林縣",lat:23.6787305081499,lng:120.479479356174,url:"https://maps.app.goo.gl/i5TpeuBpFqfiq4ej6"},
-  {name:"雙醬咖哩新豐店",city:"新竹縣",lat:24.874585502298,lng:120.994305263,url:"https://maps.app.goo.gl/6eJxVoDPrwhydCyp8"},
-  {name:"雙醬咖哩霧峰店",city:"台中市",lat:24.0694041634637,lng:120.697540272078,url:"https://maps.app.goo.gl/VzAFaWmncso7Zowv6"},
-  {name:"雙醬咖喱-苗栗店",city:"苗栗縣",lat:24.5533354023176,lng:120.815059149347,url:"https://maps.app.goo.gl/Q7oa3gHt3xpvfX3c8"},
-  {name:"雙醬咖哩-屏東東港店",city:"屏東縣",lat:22.4751907278612,lng:120.459880572078,url:"https://maps.app.goo.gl/PkbYVS8iY8GBYdzz5"},
-  {name:"雙醬咖哩-台中神岡店",city:"台中市",lat:24.2499416137613,lng:120.681378172078,url:"https://maps.app.goo.gl/sMdJHQFcqs7MsfHN8"},
-  {name:"台灣雙醬咖哩 北斗中華店",city:"彰化縣",lat:23.8761722204735,lng:120.518603072078,url:"https://maps.app.goo.gl/nUkRWJCXPG9BgHi6A"},
-  {name:"雙醬咖哩-觀音建國店",city:"桃園市",lat:25.0542010696664,lng:121.121838572078,url:"https://maps.app.goo.gl/u4aRrwDAj2X26Vhg7"},
-  {name:"雙醬咖哩－永和安樂店",city:"新北市",lat:25.00523920471,lng:121.515567678904,url:"https://maps.app.goo.gl/4KfbMp6dycbfsdE99"},
-  {name:"雙醬咖哩宜蘭店",city:"宜蘭縣",lat:24.7633177684151,lng:121.752980403886,url:"https://maps.app.goo.gl/VJNrN7GTgvxxW1939"},
-  {name:"雙醬咖哩",city:"宜蘭縣",lat:24.6754761029861,lng:121.772809249347,url:"https://maps.app.goo.gl/p4a5w3cDnUjSYeak6"},
-  {name:"雙醬咖哩-前鎮瑞和店",city:"高雄市",lat:22.6097697102733,lng:120.328014472078,url:"https://maps.app.goo.gl/2RNVK5mS11gJLRNP9"},
-  {name:"Nice Nine 雙醬咖哩",city:"嘉義縣",lat:23.5604708445535,lng:120.471174533443,url:"https://maps.app.goo.gl/D1XW1xSVUGmSmy6j8"},
-  {name:"雙醬咖哩-高雄路竹店",city:"高雄市",lat:22.8688135055943,lng:120.263936133443,url:"https://maps.app.goo.gl/efKpRS78454ADRti6"},
-  {name:"雙醬咖哩-小港桂林店",city:"高雄市",lat:22.584436734893,lng:120.360254656174,url:"https://maps.app.goo.gl/jmKiFhT7dAxNiuGs9"},
-  {name:"雙醬咖哩台南中正店（南應大）",city:"台南市",lat:23.042330651585,lng:120.239307642521,url:"https://maps.app.goo.gl/pEcPpRHMWQXe57R86"},
-  {name:"雙醬咖哩－虎尾店",city:"雲林縣",lat:23.7075035244335,lng:120.429251572078,url:"https://maps.app.goo.gl/vQXTNjnBy9q56wkB7"},
-  {name:"雙醬咖哩西勢富強店",city:"台南市",lat:23.0247006362933,lng:120.274644849347,url:"https://maps.app.goo.gl/wqDVYBMoU6bDqMoc9"},
-  {name:"雙醬咖哩 - 新市店",city:"台南市",lat:23.023910702994,lng:120.275331494809,url:"https://maps.app.goo.gl/iSTK9DcRFzcR6LmB7"},
-  {name:"雙醬咖哩 南投水里店",city:"南投縣",lat:23.8185254216972,lng:120.853056056174,url:"https://maps.app.goo.gl/zDtfyXNfiVbuhXzE8"},
-  {name:"Nice Nine 雙醬咖哩（新營店）",city:"台南市",lat:23.3109929438927,lng:120.313331156174,url:"https://maps.app.goo.gl/ni9Qo4wCGdn5n1om7"},
-  {name:"雙醬咖哩 東華大學店",city:"花蓮縣",lat:23.9082466004194,lng:121.532090394809,url:"https://maps.app.goo.gl/RhVmyQfcuwoJau7i6"},
-  {name:"雙醬咖哩-屏科大店",city:"屏東縣",lat:22.6449123451021,lng:120.594519849347,url:"https://maps.app.goo.gl/aqbbtPEVErNzTs5X9"},
-  {name:"雙醬咖哩-屏東潮州店",city:"屏東縣",lat:22.5469450438993,lng:120.549208333443,url:"https://maps.app.goo.gl/Xb1vY1XucF1t5hJG7"},
-  {name:"雙醬咖哩-北港店",city:"雲林縣",lat:23.5780686508787,lng:120.299962033443,url:"https://maps.app.goo.gl/czHwVyXJkx1H19SB8"},
-  {name:"雙醬咖哩",city:"台中市",lat:24.1456798808037,lng:120.732992694809,url:"https://maps.app.goo.gl/a5Z1VFS8mdmDtrVX8"},
-  {name:"雙醬咖喱-東山店",city:"台中市",lat:24.1787271596795,lng:120.715654896917,url:"https://maps.app.goo.gl/cESaGRi52xbinctj7"},
-  {name:"雙醬咖哩",city:"苗栗縣",lat:24.5718581112318,lng:120.760786553365,url:"https://maps.app.goo.gl/9Rhpv2d7hUM3ftVt8"},
-  {name:"雙醬咖哩草屯店",city:"南投縣",lat:23.9855899980543,lng:120.685882989618,url:"https://maps.app.goo.gl/J5wMttboeVhhw6d3A"},
-  {name:"雙醬咖哩 忠孝興大店",city:"台中市",lat:24.134697299358,lng:120.680074589618,url:"https://maps.app.goo.gl/PCt7AZ64uZVWzekb6"},
-  {name:"雙醬咖哩台中精明店",city:"台中市",lat:24.1632054923607,lng:120.654668707559,url:"https://maps.app.goo.gl/ugqgtfNujy9HrBZE9"},
-  {name:"雙醬咖喱昌平店",city:"台中市",lat:24.1722891842958,lng:120.693807498839,url:"https://maps.app.goo.gl/FcBb1mb1sBjHQz4Q6"},
-  {name:"雙醬咖哩、焦糖烤布蕾",city:"彰化縣",lat:23.9631530392665,lng:120.573648044157,url:"https://maps.app.goo.gl/AYLDeaCoYjJRFq7z6"},
-  {name:"雙醬咖哩彰化和美店",city:"彰化縣",lat:24.1189759421692,lng:120.494593844157,url:"https://maps.app.goo.gl/vEDhRWJmH646PTts7"},
-  {name:"台灣雙醬咖哩員林店",city:"彰化縣",lat:23.9704095300989,lng:120.568105189618,url:"https://maps.app.goo.gl/YtZeXkAm2tpSvfnf7"},
-  {name:"台灣雙醬咖喱 台中美村店",city:"台中市",lat:24.1570802250758,lng:120.660793144156,url:"https://maps.app.goo.gl/5johezvFcnV1gyq36"},
-  {name:"雙醬咖哩(金山店)",city:"新竹市",lat:24.7823737158735,lng:121.020681212348,url:"https://maps.app.goo.gl/U3bn7oExYVKwyw1s5"},
-  {name:"台灣雙醬咖哩（新竹北門店）",city:"新竹市",lat:24.8150984178616,lng:120.966092898195,url:"https://maps.app.goo.gl/DohBykXpAMLnydSa6"},
-  {name:"雙醬咖哩(苗栗頭份店)",city:"苗栗縣",lat:24.695161321096,lng:120.902048121426,url:"https://maps.app.goo.gl/MgLMQpA9qMuoBrso7"},
-  {name:"雙醬咖哩雙溪店",city:"新竹縣",lat:24.7695277750539,lng:120.988215930936,url:"https://maps.app.goo.gl/3v8qaAk4RM5SYKd26"},
-  {name:"雙醬咖哩向上店",city:"台中市",lat:24.1530953465011,lng:120.637260744157,url:"https://maps.app.goo.gl/6f4mwJ4FvyfBcS496"},
-  {name:"雙醬咖哩 - 中壢華美店",city:"桃園市",lat:24.9512631338209,lng:121.258750044157,url:"https://maps.app.goo.gl/5VUWZyyFEaC2B2zD9"},
-  {name:"雙醬咖哩-汐止忠孝店",city:"新北市",lat:25.0777248759811,lng:121.664745698695,url:"https://maps.app.goo.gl/vSbhvHVX79eLRaVd6"},
-  {name:"雙醬咖喱(松山饒河店)",city:"台北市",lat:25.0568888531179,lng:121.576511756951,url:"https://maps.app.goo.gl/smioaYRCdLYXriqL6"},
-  {name:"基隆雙醬咖哩 大武崙店",city:"基隆市",lat:25.1448735768829,lng:121.709720976394,url:"https://maps.app.goo.gl/rXVfXTffDKvxNUev9"},
-  {name:"台灣雙醬咖哩三峽復興店",city:"新北市",lat:24.9438822380926,lng:121.374048666887,url:"https://maps.app.goo.gl/hw8NHd4cW9ZrkyGQ9"},
-  {name:"台灣雙醬咖哩蘇澳店",city:"宜蘭縣",lat:24.6034848759675,lng:121.844426098695,url:"https://maps.app.goo.gl/YYWS8yJaxf4LMCEZA"},
-  {name:"雙醬咖哩 新竹中央店",city:"新竹市",lat:24.8181231133046,lng:120.981947957809,url:"https://maps.app.goo.gl/WYsBFPLKWVhwv4du9"},
-  {name:"雙醬咖哩 忠順店",city:"台北市",lat:24.9903515696728,lng:121.558841244157,url:"https://maps.app.goo.gl/SAAbRVBKaXw4ab6p9"},
-  {name:"雙醬咖哩桃園愛買中山店",city:"桃園市",lat:24.9940193755986,lng:121.282409021426,url:"https://maps.app.goo.gl/pzLLRJCQQTnwgeRr5"},
-  {name:"雙醬咖哩（中和新生街）",city:"新北市",lat:25.0087080636601,lng:121.482873544157,url:"https://maps.app.goo.gl/L7pfqVWVVttoJER17"},
-  {name:"雙醬咖哩 台北小巨蛋店",city:"台北市",lat:25.058790421455,lng:121.546731572034,url:"https://maps.app.goo.gl/oqCEmDNFQwGTHhE18"},
-  {name:"雙醬咖哩樹林保安店",city:"新北市",lat:25.0077746580426,lng:121.414208998052,url:"https://maps.app.goo.gl/avvKvsmj5ixemQ1S8"},
-  {name:"雙醬咖哩華新街中和店",city:"新北市",lat:24.992528029002,lng:121.511026008059,url:"https://maps.app.goo.gl/G8aq6iEpbtF85rY27"},
-  {name:"雙醬咖喱板橋莊敬店",city:"新北市",lat:25.0273746861203,lng:121.472573862241,url:"https://maps.app.goo.gl/pwxH2nSNJN6xQ37EA"},
-  {name:"台灣雙醬咖哩-三重文化北店",city:"新北市",lat:25.0727849387826,lng:121.49832306703,url:"https://maps.app.goo.gl/2hCURizdYFXgx2YPA"},
-  {name:"雙醬咖哩三重正義店",city:"新北市",lat:25.0699861632182,lng:121.498666389761,url:"https://maps.app.goo.gl/7TfBHrmH2MrmuRy39"}
+  {name:"雙醬咖哩-吳鳳店",city:"嘉義市",lat:23.4583734042461,lng:120.458592476427,url:"https://maps.app.goo.gl/c3S3uHsqRvAT3EjG7",embed:"https://www.google.com/maps/embed?pb=!4v1775400402696!6m8!1m7!1sJXyVfBiSRqTdXQINdkFyTA!2m2!1d23.45620069192082!2d120.4589296169698!3f72.41!4f0!5f0.7820865974627469"},
+  {name:"雙醬咖哩-潭子店",city:"台中市",lat:24.2061985588049,lng:120.704616078066,url:"https://maps.app.goo.gl/z3HfHzjGqEyxiWT49",embed:"https://www.google.com/maps/embed?pb=!4v1775401400897!6m8!1m7!1stvEtP2z21v8A1GzeokBjeQ!2m2!1d24.20389564245739!2d120.7043591082803!3f75.34979579412206!4f-5.41020913899014!5f0.7820865974627469"},
+  {name:"雙醬咖哩 后里甲后店",city:"台中市",lat:24.3129211596023,lng:120.723414072078,url:"https://maps.app.goo.gl/hMkHpJkZt2cWR9NK8",embed:"https://www.google.com/maps/embed?pb=!4v1775405109348!6m8!1m7!1su5xNenqFcdPTs-yD4z3nyQ!2m2!1d24.30895394031793!2d120.7237319393543!3f8.11!4f0!5f0.7820865974627469"},
+  {name:"雙醬咖哩-竹崎店",city:"嘉義縣",lat:23.5204033307398,lng:120.548784656174,url:"https://maps.app.goo.gl/xWTEkTFgof3fiWPq8",embed:"https://www.google.com/maps/embed?pb=!4v1775405121697!6m8!1m7!1szp6E6kbMLG0V9fE0n7zM_w!2m2!1d23.51705067682031!2d120.5485637267892!3f127.96!4f0!5f0.7820865974627469"},
+  {name:"Nice nine 雙醬咖哩 斗南文元店",city:"雲林縣",lat:23.6787305081499,lng:120.479479356174,url:"https://maps.app.goo.gl/i5TpeuBpFqfiq4ej6",embed:"https://www.google.com/maps/embed?pb=!4v1775405150272!6m8!1m7!1ssBT_rSkoyXl4e0RTofRQFw!2m2!1d23.67580381781031!2d120.4794728946709!3f300.9909359717519!4f-1.2988282936265136!5f0.7820865974627469"},
+  {name:"雙醬咖哩新豐店",city:"新竹縣",lat:24.874585502298,lng:120.994305263,url:"https://maps.app.goo.gl/6eJxVoDPrwhydCyp8",embed:"https://www.google.com/maps/embed?pb=!4v1775405164706!6m8!1m7!1sia2OOVtBeb_09dGzLsMPJA!2m2!1d24.87088396338875!2d120.9933237422862!3f185.93!4f0!5f0.7820865974627469"},
+  {name:"雙醬咖哩霧峰店",city:"台中市",lat:24.0694041634637,lng:120.697540272078,url:"https://maps.app.goo.gl/VzAFaWmncso7Zowv6",embed:"https://www.google.com/maps/embed?pb=!4v1775405196753!6m8!1m7!1sRK12nTUKLw_GjX8XJlg2Pw!2m2!1d24.06613501116789!2d120.6979246924697!3f170.80877284178618!4f-3.9127883911274637!5f0.7820865974627469"},
+  {name:"雙醬咖喱-苗栗店",city:"苗栗縣",lat:24.5533354023176,lng:120.815059149347,url:"https://maps.app.goo.gl/Q7oa3gHt3xpvfX3c8",embed:"https://www.google.com/maps/embed?pb=!4v1775405220833!6m8!1m7!1sa0TPszwTjWMzuWt-qZBVUg!2m2!1d24.55054225744082!2d120.8159464523021!3f220.57487826136997!4f-0.5770657863403983!5f0.7820865974627469"},
+  {name:"雙醬咖哩-屏東東港店",city:"屏東縣",lat:22.4751907278612,lng:120.459880572078,url:"https://maps.app.goo.gl/PkbYVS8iY8GBYdzz5",embed:"https://www.google.com/maps/embed?pb=!4v1775405277470!6m8!1m7!1soBIxclcjMit0owGnof-1xQ!2m2!1d22.47233711323985!2d120.4602364103253!3f35.29342786549063!4f-3.277301486232602!5f0.7820865974627469"},
+  {name:"雙醬咖哩-台中神岡店",city:"台中市",lat:24.2499416137613,lng:120.681378172078,url:"https://maps.app.goo.gl/sMdJHQFcqs7MsfHN8",embed:"https://www.google.com/maps/embed?pb=!4v1775405293381!6m8!1m7!1ssusjOhAYsq8FTYitiGunAA!2m2!1d24.24729234598578!2d120.6816587000126!3f81.96457229044061!4f-3.407365586954512!5f0.7820865974627469"},
+  {name:"台灣雙醬咖哩 北斗中華店",city:"彰化縣",lat:23.8761722204735,lng:120.518603072078,url:"https://maps.app.goo.gl/nUkRWJCXPG9BgHi6A",embed:"https://www.google.com/maps/embed?pb=!4v1775405313877!6m8!1m7!1sPYxR0M1mUhL5413aWTcYag!2m2!1d23.87289262314063!2d120.5187457090341!3f154.28605128525606!4f0.7018540537078337!5f0.7820865974627469"},
+  {name:"雙醬咖哩-觀音建國店",city:"桃園市",lat:25.0542010696664,lng:121.121838572078,url:"https://maps.app.goo.gl/u4aRrwDAj2X26Vhg7",embed:"https://www.google.com/maps/embed?pb=!4v1775405366998!6m8!1m7!1s5K5Yo1xj1cnyyTG9un_G-Q!2m2!1d25.05146966213214!2d121.1219260002313!3f197.58737155401772!4f-3.5264228429351903!5f0.7583451461907793"},
+  {name:"雙醬咖哩－永和安樂店",city:"新北市",lat:25.00523920471,lng:121.515567678904,url:"https://maps.app.goo.gl/4KfbMp6dycbfsdE99",embed:"https://www.google.com/maps/embed?pb=!4v1775405388963!6m8!1m7!1swC6dc6S0D133yDUQjzmHqQ!2m2!1d25.00233414033846!2d121.5149417391491!3f107.47416462019379!4f-6.537250533341023!5f0.7820865974627469"},
+  {name:"雙醬咖哩",city:"宜蘭縣",lat:24.6754761029861,lng:121.772809249347,url:"https://maps.app.goo.gl/p4a5w3cDnUjSYeak6",embed:"https://www.google.com/maps/embed?pb=!4v1775405553675!6m8!1m7!1sO63Pv6_g_n3F9SgZSWeAHg!2m2!1d24.6728265017892!2d121.7735265022218!3f332.1471561069011!4f3.379734184827001!5f0.7820865974627469"},
+  {name:"雙醬咖哩-前鎮瑞和店",city:"高雄市",lat:22.6097697102733,lng:120.328014472078,url:"https://maps.app.goo.gl/2RNVK5mS11gJLRNP9",embed:"https://www.google.com/maps/embed?pb=!4v1775405582729!6m8!1m7!1sTj0EwaEuX-TBZAgFC_Y3Mg!2m2!1d22.60628418774275!2d120.3282323755636!3f275.9417921991081!4f2.6577596497448894!5f0.7820865974627469"},
+  {name:"Nice Nine 雙醬咖哩",city:"嘉義縣",lat:23.5604708445535,lng:120.471174533443,url:"https://maps.app.goo.gl/D1XW1xSVUGmSmy6j8",embed:"https://www.google.com/maps/embed?pb=!4v1775405625379!6m8!1m7!1s7JT5w1oVm2YFi1guf6V2LA!2m2!1d23.55733094536698!2d120.4713018717094!3f246.0214402167009!4f0.786943668150812!5f0.4000000000000002"},
+  {name:"雙醬咖哩-高雄路竹店",city:"高雄市",lat:22.8688135055943,lng:120.263936133443,url:"https://maps.app.goo.gl/efKpRS78454ADRti6",embed:"https://www.google.com/maps/embed?pb=!4v1775405655506!6m8!1m7!1su0OxuJED5DgeO-LX9UgUgQ!2m2!1d22.8651395374563!2d120.2639810282715!3f87.79717809309805!4f2.5343659674513077!5f0.7820865974627469"},
+  {name:"雙醬咖哩-小港桂林店",city:"高雄市",lat:22.584436734893,lng:120.360254656174,url:"https://maps.app.goo.gl/jmKiFhT7dAxNiuGs9",embed:"https://www.google.com/maps/embed?pb=!4v1775405674105!6m8!1m7!1sb74xeVb8YGw3g36trwaucw!2m2!1d22.58152532761821!2d120.3600246597618!3f130.20801491526714!4f-0.38503225075128!5f0.7820865974627469"},
+  {name:"雙醬咖哩台南中正店（南應大）",city:"台南市",lat:23.042330651585,lng:120.239307642521,url:"https://maps.app.goo.gl/pEcPpRHMWQXe57R86",embed:"https://www.google.com/maps/embed?pb=!4v1775405696206!6m8!1m7!1sUM-hH0mSkX_Qx57sP56IVw!2m2!1d23.0380670435334!2d120.240855773813!3f342.77991201129083!4f-3.51597226500553!5f0.7820865974627469"},
+  {name:"雙醬咖哩－虎尾店",city:"雲林縣",lat:23.7075035244335,lng:120.429251572078,url:"https://maps.app.goo.gl/vQXTNjnBy9q56wkB7",embed:"https://www.google.com/maps/embed?pb=!4v1775405884947!6m8!1m7!1sLUWcSMi8JlAbSlgBv-DllQ!2m2!1d23.70434485621753!2d120.4295959609764!3f188.15041396916405!4f-3.6861738621591655!5f0.4000000000000002"},
+  {name:"雙醬咖哩西勢富強店",city:"台南市",lat:23.0247006362933,lng:120.274644849347,url:"https://maps.app.goo.gl/wqDVYBMoU6bDqMoc9",embed:"https://www.google.com/maps/embed?pb=!4v1775405918668!6m8!1m7!1smuvK-xqoOFGKs22Xyz6Sxg!2m2!1d23.02107051320977!2d120.2751871546064!3f50.4011013573227!4f-8.277961696632815!5f0.4000000000000002"},
+  {name:"雙醬咖哩 - 新市店",city:"台南市",lat:23.023910702994,lng:120.275331494809,url:"https://maps.app.goo.gl/iSTK9DcRFzcR6LmB7",embed:"https://www.google.com/maps/embed?pb=!4v1775406327284!6m8!1m7!1s63wn9pInRIibs8PUMpgZOQ!2m2!1d23.07413041615624!2d120.2891204419161!3f82.1104298854813!4f2.8705371153250496!5f0.7820865974627469"},
+  {name:"雙醬咖哩 南投水里店",city:"南投縣",lat:23.8185254216972,lng:120.853056056174,url:"https://maps.app.goo.gl/zDtfyXNfiVbuhXzE8",embed:"https://www.google.com/maps/embed?pb=!4v1775406361509!6m8!1m7!1sTwy_yVaLfsI2XW4PazVl4g!2m2!1d23.81511780277177!2d120.8529261762382!3f302.9363677776044!4f-4.019065442702058!5f0.4000000000000002"},
+  {name:"Nice Nine 雙醬咖哩（新營店）",city:"台南市",lat:23.3109929438927,lng:120.313331156174,url:"https://maps.app.goo.gl/ni9Qo4wCGdn5n1om7",embed:"https://www.google.com/maps/embed?pb=!4v1775406388519!6m8!1m7!1sRVy7HeV7IVcme5aFr5yRiw!2m2!1d23.30754031479865!2d120.3132054647212!3f200.56388504470843!4f-2.5460758164786768!5f0.7820865974627469"},
+  {name:"雙醬咖哩 東華大學店",city:"花蓮縣",lat:23.9082466004194,lng:121.532090394809,url:"https://maps.app.goo.gl/RhVmyQfcuwoJau7i6",embed:"https://www.google.com/maps/embed?pb=!4v1775490925565!6m8!1m7!1stALucC4Qgj39ct3uaKvWoA!2m2!1d23.90622775633896!2d121.532067484986!3f140.6602126728894!4f-4.469080758947342!5f0.7820865974627469"},
+  {name:"雙醬咖哩-屏科大店",city:"屏東縣",lat:22.6449123451021,lng:120.594519849347,url:"https://maps.app.goo.gl/aqbbtPEVErNzTs5X9",embed:"https://www.google.com/maps/embed?pb=!4v1775490980219!6m8!1m7!1smSrKDU7LZXcefoCOQ44VuA!2m2!1d22.64189978661069!2d120.5956251572507!3f202.8252774381462!4f-2.8720709856750517!5f0.4000000000000002"},
+  {name:"雙醬咖哩-屏東潮州店",city:"屏東縣",lat:22.5469450438993,lng:120.549208333443,url:"https://maps.app.goo.gl/Xb1vY1XucF1t5hJG7",embed:"https://www.google.com/maps/embed?pb=!4v1775491008595!6m8!1m7!1smen1ixycu6qGCa18JKggxA!2m2!1d22.54434070815207!2d120.5493633455972!3f319.8994423353262!4f-5.473474575304579!5f0.4000000000000002"},
+  {name:"雙醬咖哩-北港店",city:"雲林縣",lat:23.5780686508787,lng:120.299962033443,url:"https://maps.app.goo.gl/czHwVyXJkx1H19SB8",embed:"https://www.google.com/maps/embed?pb=!4v1775491042949!6m8!1m7!1s6EY-iuoXPAmcle2s2wU6pw!2m2!1d23.5742316104546!2d120.3001932107408!3f333.27003476960647!4f-7.968479996151046!5f0.4000000000000002"},
+  {name:"雙醬咖哩",city:"台中市",lat:24.1456798808037,lng:120.732992694809,url:"https://maps.app.goo.gl/a5Z1VFS8mdmDtrVX8",embed:"https://www.google.com/maps/embed?pb=!4v1775491065842!6m8!1m7!1srHYmVUWnxXEkJpflpEcMNw!2m2!1d24.14304976475946!2d120.7328101017421!3f117.87947962440704!4f-6.272052396007979!5f0.7820865974627469"},
+  {name:"雙醬咖喱-東山店",city:"台中市",lat:24.1787271596795,lng:120.715654896917,url:"https://maps.app.goo.gl/cESaGRi52xbinctj7",embed:"https://www.google.com/maps/embed?pb=!4v1775491085665!6m8!1m7!1sxq2UxccGXWcdT1gbCF5yew!2m2!1d24.17468955462379!2d120.7156928121405!3f92.86748305482301!4f-2.4288578447863074!5f0.4000000000000002"},
+  {name:"雙醬咖哩草屯店",city:"南投縣",lat:23.9855899980543,lng:120.685882989618,url:"https://maps.app.goo.gl/J5wMttboeVhhw6d3A",embed:"https://www.google.com/maps/embed?pb=!4v1775491280317!6m8!1m7!1sHBfcC_EaR0PEnE0kzMjvxQ!2m2!1d23.97824656341885!2d120.685877838238!3f153.54403837860673!4f0.07136713043503562!5f0.4000000000000002"},
+  {name:"雙醬咖哩 忠孝興大店",city:"台中市",lat:24.134697299358,lng:120.680074589618,url:"https://maps.app.goo.gl/PCt7AZ64uZVWzekb6",embed:"https://www.google.com/maps/embed?pb=!4v1775491300894!6m8!1m7!1s7640gBXoSWSL9ds6nP_T3w!2m2!1d24.1287954422848!2d120.6800820142062!3f292.2606107842856!4f-0.29494774290188275!5f0.4000000000000002"},
+  {name:"雙醬咖哩台中精明店",city:"台中市",lat:24.1632054923607,lng:120.654668707559,url:"https://maps.app.goo.gl/ugqgtfNujy9HrBZE9",embed:"https://www.google.com/maps/embed?pb=!4v1775491342027!6m8!1m7!1sIXLJN7OXiM6SjwIg5ce5GA!2m2!1d24.15670006747529!2d120.6560769166114!3f59.55096327090868!4f2.562109871630099!5f0.4000000000000002"},
+  {name:"雙醬咖喱昌平店",city:"台中市",lat:24.1722891842958,lng:120.693807498839,url:"https://maps.app.goo.gl/FcBb1mb1sBjHQz4Q6",embed:"https://www.google.com/maps/embed?pb=!4v1775491377624!6m8!1m7!1sx9nGJFpSPC26KSn7qw6GAg!2m2!1d24.16630835312392!2d120.6941067142192!3f356.0773434441597!4f1.947632838531689!5f0.4000000000000002"},
+  {name:"雙醬咖哩、焦糖烤布蕾",city:"彰化縣",lat:23.9631530392665,lng:120.573648044157,url:"https://maps.app.goo.gl/AYLDeaCoYjJRFq7z6",embed:"https://www.google.com/maps/embed?pb=!4v1775491404050!6m8!1m7!1sf5wtvDQDSyIFbvvcmncsqw!2m2!1d23.95656356553338!2d120.5743835850448!3f307.00630524774607!4f3.68495238489119!5f0.4000000000000002"},
+  {name:"雙醬咖哩彰化和美店",city:"彰化縣",lat:24.1189759421692,lng:120.494593844157,url:"https://maps.app.goo.gl/vEDhRWJmH646PTts7",embed:"https://www.google.com/maps/embed?pb=!4v1775491437353!6m8!1m7!1sG0sffh4wpvw48I5Gt8BVcA!2m2!1d24.11250766872162!2d120.4952543594051!3f83.71299859774895!4f-4.800999907949901!5f0.4000000000000002"},
+  {name:"台灣雙醬咖哩員林店",city:"彰化縣",lat:23.9704095300989,lng:120.568105189618,url:"https://maps.app.goo.gl/YtZeXkAm2tpSvfnf7",embed:"https://www.google.com/maps/embed?pb=!4v1775491583531!6m8!1m7!1sGRK_Zbx5YLk8d58r9yUw9A!2m2!1d23.9623081992411!2d120.5682204720283!3f74.67265824731783!4f-0.18981262301124957!5f0.4000000000000002"},
+  {name:"台灣雙醬咖喱 台中美村店",city:"台中市",lat:24.1570802250758,lng:120.660793144156,url:"https://maps.app.goo.gl/5johezvFcnV1gyq36",embed:"https://www.google.com/maps/embed?pb=!4v1775491673761!6m8!1m7!1snADodsCG4olnBf-QMfN8qQ!2m2!1d24.14943802749796!2d120.6616793882499!3f226.96989237901445!4f-7.434455817900258!5f0.4000000000000002"},
+  {name:"雙醬咖哩(金山店)",city:"新竹市",lat:24.7823737158735,lng:121.020681212348,url:"https://maps.app.goo.gl/U3bn7oExYVKwyw1s5",embed:"https://www.google.com/maps/embed?pb=!4v1775491697791!6m8!1m7!1sgmVeA-rRYfhcqHiGsIRv1g!2m2!1d24.77611398763987!2d121.0204621192632!3f217.3901261029893!4f-1.2994175441449158!5f0.4000000000000002"},
+  {name:"台灣雙醬咖哩（新竹北門店）",city:"新竹市",lat:24.8150984178616,lng:120.966092898195,url:"https://maps.app.goo.gl/DohBykXpAMLnydSa6",embed:"https://www.google.com/maps/embed?pb=!4v1775491725167!6m8!1m7!1ssgg2R1GQBqCKUnw3pHejRQ!2m2!1d24.80674586339935!2d120.9658170551017!3f209.2516670257938!4f6.729532311248249!5f0.4000000000000002"},
+  {name:"雙醬咖哩(苗栗頭份店)",city:"苗栗縣",lat:24.695161321096,lng:120.902048121426,url:"https://maps.app.goo.gl/MgLMQpA9qMuoBrso7",embed:"https://www.google.com/maps/embed?pb=!4v1775491770831!6m8!1m7!1sh8Ab3liMCUicT4Ta_ddssw!2m2!1d24.68774492722125!2d120.9032143536471!3f23.222076924393164!4f-3.911969186277304!5f0.4000000000000002"},
+  {name:"雙醬咖哩雙溪店",city:"新竹縣",lat:24.7695277750539,lng:120.988215930936,url:"https://maps.app.goo.gl/3v8qaAk4RM5SYKd26",embed:"https://www.google.com/maps/embed?pb=!4v1775491796120!6m8!1m7!1s_UYpo7qfuZo9iM-l-VBXYw!2m2!1d24.76393317004549!2d120.9885583985643!3f261.65417562887546!4f6.072341905091591!5f0.4000000000000002"},
+  {name:"雙醬咖哩向上店",city:"台中市",lat:24.1530953465011,lng:120.637260744157,url:"https://maps.app.goo.gl/6f4mwJ4FvyfBcS496",embed:"https://www.google.com/maps/embed?pb=!4v1775534307215!6m8!1m7!1sMV_3xIHWf8-ry3sofEkONg!2m2!1d24.14710034139818!2d120.6379342599152!3f211.5448061951838!4f-4.796777888572905!5f0.4000000000000002"},
+  {name:"雙醬咖哩 - 中壢華美店",city:"桃園市",lat:24.9512631338209,lng:121.258750044157,url:"https://maps.app.goo.gl/5VUWZyyFEaC2B2zD9",embed:"https://www.google.com/maps/embed?pb=!4v1775534329227!6m8!1m7!1shGVLNVeezdE7KUdR0SQciA!2m2!1d24.94686528262977!2d121.2593381621595!3f136.44176876516096!4f2.9193353755300677!5f0.4000000000000002"},
+  {name:"雙醬咖哩-汐止忠孝店",city:"新北市",lat:25.0777248759811,lng:121.664745698695,url:"https://maps.app.goo.gl/vSbhvHVX79eLRaVd6",embed:"https://www.google.com/maps/embed?pb=!4v1775534373385!6m8!1m7!1smyJusiZ3RMOQdBX3qt6xAQ!2m2!1d25.07197477066676!2d121.6660014073933!3f44.67463051231702!4f3.040950233535767!5f0.4000000000000002"},
+  {name:"雙醬咖喱(松山饒河店)",city:"台北市",lat:25.0568888531179,lng:121.576511756951,url:"https://maps.app.goo.gl/smioaYRCdLYXriqL6",embed:"https://www.google.com/maps/embed?pb=!4v1775534439822!6m8!1m7!1sNq9KHCi-s7zxAcTCCExpHg!2m2!1d25.0506029068177!2d121.5758842224068!3f50.10947920657024!4f-7.589900476563372!5f0.4000000000000002"},
+  {name:"基隆雙醬咖哩 大武崙店",city:"基隆市",lat:25.1448735768829,lng:121.709720976394,url:"https://maps.app.goo.gl/rXVfXTffDKvxNUev9",embed:"https://www.google.com/maps/embed?pb=!4v1775534463601!6m8!1m7!1sBmrOoNycGYmD2SJATQg8wg!2m2!1d25.14051120709562!2d121.7086748490102!3f49.350673206058374!4f-5.893902792291684!5f0.7820865974627469"},
+  {name:"台灣雙醬咖哩三峽復興店",city:"新北市",lat:24.9438822380926,lng:121.374048666887,url:"https://maps.app.goo.gl/hw8NHd4cW9ZrkyGQ9",embed:"https://www.google.com/maps/embed?pb=!4v1775534512574!6m8!1m7!1sa4tY3lDAMjFWWovbMXBcyg!2m2!1d24.93621964307911!2d121.3742813158179!3f110.46024828883051!4f-10.42040984408672!5f0.4000000000000002"},
+  {name:"台灣雙醬咖哩蘇澳店",city:"宜蘭縣",lat:24.6034848759675,lng:121.844426098695,url:"https://maps.app.goo.gl/YYWS8yJaxf4LMCEZA",embed:"https://www.google.com/maps/embed?pb=!4v1775534543242!6m8!1m7!1sc6c5wRe25eMYBDDelUNRqA!2m2!1d24.59578748196641!2d121.8457362933844!3f65.59260797273573!4f0.20761165903722656!5f0.7820865974627469"},
+  {name:"雙醬咖哩 新竹中央店",city:"新竹市",lat:24.8181231133046,lng:120.981947957809,url:"https://maps.app.goo.gl/WYsBFPLKWVhwv4du9",embed:"https://www.google.com/maps/embed?pb=!4v1775534621041!6m8!1m7!1sGBRcg7JI-i3YJejJ9GPxlQ!2m2!1d24.81210514936182!2d120.9808308251913!3f304.49307027895065!4f-6.580609693570963!5f0.7820865974627469"},
+  {name:"雙醬咖哩 忠順店",city:"台北市",lat:24.9903515696728,lng:121.558841244157,url:"https://maps.app.goo.gl/SAAbRVBKaXw4ab6p9",embed:"https://www.google.com/maps/embed?pb=!4v1775534649728!6m8!1m7!1snFIDs_wUOBxOk0uV3FW2Vw!2m2!1d24.98414066581897!2d121.5595107663198!3f57.14518442063792!4f-4.612718448842102!5f0.7820865974627469"},
+  {name:"雙醬咖哩桃園愛買中山店",city:"桃園市",lat:24.9940193755986,lng:121.282409021426,url:"https://maps.app.goo.gl/pzLLRJCQQTnwgeRr5",embed:"https://www.google.com/maps/embed?pb=!4v1775534698508!6m8!1m7!1sXYV3yA3X7ew0sdo63ahG6Q!2m2!1d24.98758123297523!2d121.2836159884527!3f118.6720039666107!4f-6.5294652678084475!5f0.4000000000000002"},
+  {name:"雙醬咖哩（中和新生街）",city:"新北市",lat:25.0087080636601,lng:121.482873544157,url:"https://maps.app.goo.gl/L7pfqVWVVttoJER17",embed:"https://www.google.com/maps/embed?pb=!4v1775534722536!6m8!1m7!1suohU_DRBVaUN_trluAc3kg!2m2!1d25.00197286593843!2d121.4834717494154!3f16.201081068250005!4f-11.834010785966768!5f0.7820865974627469"},
+  {name:"雙醬咖哩 台北小巨蛋店",city:"台北市",lat:25.058790421455,lng:121.546731572034,url:"https://maps.app.goo.gl/oqCEmDNFQwGTHhE18",embed:"https://www.google.com/maps/embed?pb=!4v1775534747106!6m8!1m7!1skxbe6rDf18vFFheRf_Lr9A!2m2!1d25.05368212640974!2d121.548014048224!3f166.03941280737973!4f-5.5345431111818755!5f0.4000000000000002"},
+  {name:"雙醬咖哩樹林保安店",city:"新北市",lat:25.0077746580426,lng:121.414208998052,url:"https://maps.app.goo.gl/avvKvsmj5ixemQ1S8",embed:"https://www.google.com/maps/embed?pb=!4v1775534777759!6m8!1m7!1sJHhAVyObbK6kBP25nVx8Fg!2m2!1d25.00212422174852!2d121.4153555844065!3f138.47303124105264!4f-2.598370260609613!5f0.7820865974627469"},
+  {name:"雙醬咖哩華新街中和店",city:"新北市",lat:24.992528029002,lng:121.511026008059,url:"https://maps.app.goo.gl/G8aq6iEpbtF85rY27",embed:"https://www.google.com/maps/embed?pb=!4v1775534797454!6m8!1m7!1sOnbwgtjx2h1jYfWJKbw0XQ!2m2!1d24.98492580317543!2d121.5076096786072!3f318.49087204101994!4f-5.955167188211561!5f0.4000000000000002"},
+  {name:"雙醬咖喱板橋莊敬店",city:"新北市",lat:25.0273746861203,lng:121.472573862241,url:"https://maps.app.goo.gl/pwxH2nSNJN6xQ37EA",embed:"https://www.google.com/maps/embed?pb=!4v1775534839902!6m8!1m7!1silrE1R-F8pV_uW0V6p9QKg!2m2!1d25.02135247981979!2d121.472018572553!3f74.4700842664119!4f5.5863909653303665!5f0.7820865974627469"},
+  {name:"台灣雙醬咖哩-三重文化北店",city:"新北市",lat:25.0727849387826,lng:121.49832306703,url:"https://maps.app.goo.gl/2hCURizdYFXgx2YPA",embed:"https://www.google.com/maps/embed?pb=!4v1775534878041!6m8!1m7!1sVWZcU5-dgNtCQLEu54WhJA!2m2!1d25.06706931290328!2d121.4983568660619!3f178.64112756054624!4f-4.9303682758239376!5f0.4000000000000002"},
+  {name:"雙醬咖哩三重正義店",city:"新北市",lat:25.0699861632182,lng:121.498666389761,url:"https://maps.app.goo.gl/7TfBHrmH2MrmuRy39",embed:"https://www.google.com/maps/embed?pb=!4v1775534944848!6m8!1m7!1sld1BEGJD0opwrVXLkyOd1g!2m2!1d25.06318931804261!2d121.4972124885915!3f91.42233480267393!4f-1.7203805618475059!5f0.7820865974627469"}
 ];
 
 let gameStores=[], currentRound=0, totalScore=0, successCount=0;
@@ -301,244 +297,189 @@ let timerInterval=null, timeLeft=TIME_LIMIT, timedOut=false;
 
 function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 
-let panorama = null;
-
 function loadStreetView(store) {
+  const frame = document.getElementById('sv-frame');
   const loading = document.getElementById('sv-loading');
-  const errEl = document.getElementById('sv-error');
   loading.style.opacity = '1';
-  loading.style.display = 'flex';
-  errEl.style.display = 'none';
-
-  const svService = new google.maps.StreetViewService();
-  const storeLatLng = new google.maps.LatLng(store.lat, store.lng);
-
-  svService.getPanorama({ location: storeLatLng, radius: 50, preference: google.maps.StreetViewPreference.NEAREST }, (data, status) => {
-    if (status === google.maps.StreetViewStatus.OK) {
-      const panoLatLng = data.location.latLng;
-
-      // 計算街景點朝向店面的角度
-      const heading = google.maps.geometry.spherical.computeHeading(panoLatLng, storeLatLng);
-
-      if (!panorama) {
-        panorama = new google.maps.StreetViewPanorama(document.getElementById('sv-pano'), {
-          pano: data.location.pano,
-          pov: { heading: heading, pitch: 0 },
-          zoom: 1,
-          addressControl: false,
-          fullscreenControl: false,
-          motionTracking: false,
-          motionTrackingControl: false,
-          showRoadLabels: false,
-        });
-      } else {
-        panorama.setPano(data.location.pano);
-        panorama.setPov({ heading: heading, pitch: 0 });
-      }
-
-      loading.style.opacity = '0';
-      setTimeout(() => { loading.style.display = 'none'; }, 500);
-    } else {
-      // 找不到街景，擴大搜尋範圍再試一次
-      svService.getPanorama({ location: storeLatLng, radius: 200 }, (data2, status2) => {
-        loading.style.display = 'none';
-        if (status2 === google.maps.StreetViewStatus.OK) {
-          const panoLatLng = data2.location.latLng;
-          const heading = google.maps.geometry.spherical.computeHeading(panoLatLng, storeLatLng);
-          if (!panorama) {
-            panorama = new google.maps.StreetViewPanorama(document.getElementById('sv-pano'), {
-              pano: data2.location.pano,
-              pov: { heading: heading, pitch: 0 },
-              zoom: 1,
-              addressControl: false,
-              fullscreenControl: false,
-              motionTracking: false,
-              motionTrackingControl: false,
-              showRoadLabels: false,
-            });
-          } else {
-            panorama.setPano(data2.location.pano);
-            panorama.setPov({ heading: heading, pitch: 0 });
-          }
-        } else {
-          errEl.style.display = 'flex';
-        }
-      });
-    }
-  });
+  frame.src = store.embed;
+  frame.onload = () => { loading.style.opacity = '0'; };
 }
 
-function startGame(){
-  document.getElementById('splash').style.display='none';
+function startGame() {
+  document.getElementById('splash').style.display = 'none';
   document.getElementById('game').classList.add('active');
-  gameStores=shuffle(STORES).slice(0,TOTAL_ROUNDS);
-  currentRound=0;totalScore=0;successCount=0;
-  initMap();loadRound();
+  gameStores = shuffle(STORES).slice(0, TOTAL_ROUNDS);
+  currentRound = 0; totalScore = 0; successCount = 0;
+  initMap(); loadRound();
 }
 
-function initMap(){
-  map=new google.maps.Map(document.getElementById('map'),{
-    center:{lat:23.8,lng:121.0}, zoom:7,
-    mapTypeId:'roadmap',
-    streetViewControl:false,
-    fullscreenControl:false,
-    mapTypeControl:false,
+function initMap() {
+  map = new google.maps.Map(document.getElementById('map'), {
+    center: {lat: 23.8, lng: 121.0}, zoom: 7,
+    mapTypeId: 'roadmap',
+    streetViewControl: false,
+    fullscreenControl: false,
+    mapTypeControl: false,
   });
-  infoWindow=new google.maps.InfoWindow();
-  map.addListener('click',(e)=>onMapClick(e.latLng));
+  infoWindow = new google.maps.InfoWindow();
+  map.addListener('click', (e) => onMapClick(e.latLng));
 }
 
-function loadRound(){
-  if(guessMarker){guessMarker.setMap(null);guessMarker=null;}
-  if(answerMarker){answerMarker.setMap(null);answerMarker=null;}
-  if(polyline){polyline.setMap(null);polyline=null;}
-  if(infoWindow)infoWindow.close();
-  selectedLatLng=null;timedOut=false;
-  document.getElementById('guess-btn').disabled=true;
+function loadRound() {
+  if(guessMarker) { guessMarker.setMap(null); guessMarker = null; }
+  if(answerMarker) { answerMarker.setMap(null); answerMarker = null; }
+  if(polyline) { polyline.setMap(null); polyline = null; }
+  if(infoWindow) infoWindow.close();
+  selectedLatLng = null; timedOut = false;
+  document.getElementById('guess-btn').disabled = true;
   document.getElementById('timeout-notice').classList.remove('show');
 
-  const s=gameStores[currentRound];
+  const s = gameStores[currentRound];
   loadStreetView(s);
-  document.getElementById('hint-text').innerHTML=
-    `<strong>🍛 這間雙醬咖哩在哪裡？</strong><br><br>`+
-    `📍 位於 <strong style="color:#f5a623;font-size:1.1em">${s.city}</strong><br><br>`+
+
+  document.getElementById('hint-text').innerHTML =
+    `<strong>🍛 這間雙醬咖哩在哪裡？</strong><br><br>` +
+    `📍 位於 <strong style="color:#f5a623;font-size:1.1em">${s.city}</strong><br><br>` +
     `<span style="color:#666;font-size:0.85em">觀察街景的環境、招牌、建築來判斷位置</span>`;
 
-  document.getElementById('cur-round').textContent=currentRound+1;
-  document.getElementById('cur-score').textContent=totalScore;
-  document.getElementById('cur-success').textContent=successCount;
-  document.getElementById('progress-fill').style.width=((currentRound/TOTAL_ROUNDS)*100)+'%';
-  document.getElementById('round-indicator').textContent=`第 ${currentRound+1} / ${TOTAL_ROUNDS} 關`;
-  map.setCenter({lat:23.8,lng:121.0});map.setZoom(7);
+  document.getElementById('cur-round').textContent = currentRound + 1;
+  document.getElementById('cur-score').textContent = totalScore;
+  document.getElementById('cur-success').textContent = successCount;
+  document.getElementById('progress-fill').style.width = ((currentRound / TOTAL_ROUNDS) * 100) + '%';
+  document.getElementById('round-indicator').textContent = `第 ${currentRound + 1} / ${TOTAL_ROUNDS} 關`;
+  map.setCenter({lat: 23.8, lng: 121.0}); map.setZoom(7);
   startTimer();
 }
 
-function startTimer(){
+function startTimer() {
   clearInterval(timerInterval);
-  timeLeft=TIME_LIMIT;updateTimerDisplay();
-  timerInterval=setInterval(()=>{
-    timeLeft--;updateTimerDisplay();
-    if(timeLeft<=0){clearInterval(timerInterval);timedOut=true;document.getElementById('timeout-notice').classList.add('show');submitGuess(true);}
-  },1000);
+  timeLeft = TIME_LIMIT; updateTimerDisplay();
+  timerInterval = setInterval(() => {
+    timeLeft--; updateTimerDisplay();
+    if(timeLeft <= 0) {
+      clearInterval(timerInterval); timedOut = true;
+      document.getElementById('timeout-notice').classList.add('show');
+      submitGuess(true);
+    }
+  }, 1000);
 }
 
-function updateTimerDisplay(){
-  const m=Math.floor(timeLeft/60),s=timeLeft%60;
-  const el=document.getElementById('timer-num');
-  el.textContent=`${m}:${s.toString().padStart(2,'0')}`;
-  el.classList.toggle('warn',timeLeft<=10);
-  const pct=(timeLeft/TIME_LIMIT)*100;
-  const bar=document.getElementById('timer-bar');
-  bar.style.width=pct+'%';
-  bar.style.background=timeLeft<=10?'#e74c3c':timeLeft<=20?'#f39c12':'#4ecdc4';
+function updateTimerDisplay() {
+  const m = Math.floor(timeLeft / 60), s = timeLeft % 60;
+  const el = document.getElementById('timer-num');
+  el.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+  el.classList.toggle('warn', timeLeft <= 10);
+  const pct = (timeLeft / TIME_LIMIT) * 100;
+  const bar = document.getElementById('timer-bar');
+  bar.style.width = pct + '%';
+  bar.style.background = timeLeft <= 10 ? '#e74c3c' : timeLeft <= 20 ? '#f39c12' : '#4ecdc4';
 }
 
-function onMapClick(latLng){
-  if(timedOut)return;
-  selectedLatLng=latLng;
-  if(guessMarker)guessMarker.setMap(null);
-  guessMarker=new google.maps.Marker({
-    position:latLng, map:map,
-    icon:{path:google.maps.SymbolPath.CIRCLE, scale:10, fillColor:'#f5a623', fillOpacity:1, strokeColor:'#fff', strokeWeight:3},
-    title:'你的猜測'
+function onMapClick(latLng) {
+  if(timedOut) return;
+  selectedLatLng = latLng;
+  if(guessMarker) guessMarker.setMap(null);
+  guessMarker = new google.maps.Marker({
+    position: latLng, map: map,
+    icon: {path: google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: '#f5a623', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 3},
+    title: '你的猜測'
   });
-  document.getElementById('guess-btn').disabled=false;
+  document.getElementById('guess-btn').disabled = false;
 }
 
-function calcDist(lat1,lng1,lat2,lng2){
-  const R=6371000,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
-  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+function calcDist(lat1, lng1, lat2, lng2) {
+  const R = 6371000, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-function calcScore(d){
-  if(d<=3000)return Math.round(1000-(d/3000)*500);
-  if(d<=50000)return Math.round(Math.max(0,500-((d-3000)/47000)*500));
+function calcScore(d) {
+  if(d <= 3000) return Math.round(1000 - (d/3000)*500);
+  if(d <= 50000) return Math.round(Math.max(0, 500 - ((d-3000)/47000)*500));
   return 0;
 }
 
-function submitGuess(isTimeout){
+function submitGuess(isTimeout) {
   clearInterval(timerInterval);
-  document.getElementById('guess-btn').disabled=true;
-  const store=gameStores[currentRound];
-  let dist,pts,success;
+  document.getElementById('guess-btn').disabled = true;
+  const store = gameStores[currentRound];
+  let dist, pts, success;
 
-  if(!selectedLatLng){
-    dist=null;pts=0;success=false;
-  }else{
-    dist=calcDist(selectedLatLng.lat(),selectedLatLng.lng(),store.lat,store.lng);
-    pts=calcScore(dist);success=dist<=3000;
+  if(!selectedLatLng) {
+    dist = null; pts = 0; success = false;
+  } else {
+    dist = calcDist(selectedLatLng.lat(), selectedLatLng.lng(), store.lat, store.lng);
+    pts = calcScore(dist); success = dist <= 3000;
   }
-  if(success)successCount++;
-  totalScore+=pts;
+  if(success) successCount++;
+  totalScore += pts;
 
-  // Answer marker
-  answerMarker=new google.maps.Marker({
-    position:{lat:store.lat,lng:store.lng}, map:map,
-    icon:{url:'https://maps.google.com/mapfiles/ms/icons/orange-dot.png'},
-    title:store.name
+  answerMarker = new google.maps.Marker({
+    position: {lat: store.lat, lng: store.lng}, map: map,
+    icon: {url: 'https://maps.google.com/mapfiles/ms/icons/orange-dot.png'},
+    title: store.name
   });
   infoWindow.setContent(`<div style="font-weight:bold;color:#333">${store.name}</div>`);
-  infoWindow.open(map,answerMarker);
+  infoWindow.open(map, answerMarker);
 
-  if(selectedLatLng){
-    polyline=new google.maps.Polyline({
-      path:[selectedLatLng,{lat:store.lat,lng:store.lng}],
-      strokeColor:success?'#4ecdc4':'#e74c3c',
-      strokeOpacity:0.85, strokeWeight:3,
-      icons:[{icon:{path:'M 0,-1 0,1',strokeOpacity:1,scale:3},offset:'0',repeat:'12px'}],
-      map:map
+  if(selectedLatLng) {
+    polyline = new google.maps.Polyline({
+      path: [selectedLatLng, {lat: store.lat, lng: store.lng}],
+      strokeColor: success ? '#4ecdc4' : '#e74c3c',
+      strokeOpacity: 0.85, strokeWeight: 3,
+      icons: [{icon: {path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3}, offset: '0', repeat: '12px'}],
+      map: map
     });
-    const bounds=new google.maps.LatLngBounds();
-    bounds.extend(selectedLatLng);bounds.extend({lat:store.lat,lng:store.lng});
-    map.fitBounds(bounds,{padding:60});
-  }else{
-    map.setCenter({lat:store.lat,lng:store.lng});map.setZoom(14);
+    const bounds = new google.maps.LatLngBounds();
+    bounds.extend(selectedLatLng); bounds.extend({lat: store.lat, lng: store.lng});
+    map.fitBounds(bounds, {padding: 60});
+  } else {
+    map.setCenter({lat: store.lat, lng: store.lng}); map.setZoom(14);
   }
 
-  const distText=dist===null?'未作答':dist>=1000?`${(dist/1000).toFixed(1)} 公里`:`${Math.round(dist)} 公尺`;
-  document.getElementById('result-icon').textContent=success?'🎉':dist===null?'⏰':'😅';
-  document.getElementById('result-title').textContent=success?'答對了！':dist===null?'時間到，未作答':'差一點～';
-  document.getElementById('result-store').textContent=`📍 ${store.name}`;
-  document.getElementById('result-dist').textContent=dist===null?'':`距離正確位置 ${distText}`;
-  document.getElementById('result-pts').textContent=`+${pts} 分`;
+  const distText = dist === null ? '未作答' : dist >= 1000 ? `${(dist/1000).toFixed(1)} 公里` : `${Math.round(dist)} 公尺`;
+  document.getElementById('result-icon').textContent = success ? '🎉' : dist === null ? '⏰' : '😅';
+  document.getElementById('result-title').textContent = success ? '答對了！' : dist === null ? '時間到，未作答' : '差一點～';
+  document.getElementById('result-store').textContent = `📍 ${store.name}`;
+  document.getElementById('result-dist').textContent = dist === null ? '' : `距離正確位置 ${distText}`;
+  document.getElementById('result-pts').textContent = `+${pts} 分`;
 
-  const linkEl=document.getElementById('street-link');
-  if(store.url&&store.url.startsWith('http')){linkEl.href=store.url;linkEl.style.display='inline-block';}
-  else{linkEl.style.display='none';}
+  const linkEl = document.getElementById('street-link');
+  if(store.url && store.url.startsWith('http')) { linkEl.href = store.url; linkEl.style.display = 'inline-block'; }
+  else { linkEl.style.display = 'none'; }
 
-  document.getElementById('next-btn').textContent=currentRound+1>=TOTAL_ROUNDS?'查看結果 🏆':'下一關 →';
+  document.getElementById('next-btn').textContent = currentRound + 1 >= TOTAL_ROUNDS ? '查看結果 🏆' : '下一關 →';
   document.getElementById('result-overlay').classList.add('show');
 }
 
-function nextRound(){
+function nextRound() {
   document.getElementById('result-overlay').classList.remove('show');
   currentRound++;
-  if(currentRound>=TOTAL_ROUNDS)showFinal();else loadRound();
+  if(currentRound >= TOTAL_ROUNDS) showFinal(); else loadRound();
 }
 
-function showFinal(){
-  const pct=totalScore/(TOTAL_ROUNDS*1000);
-  const msg=pct>=0.9?'🏆 你是雙醬咖哩的超級粉絲！':pct>=0.7?'👏 對台灣地理非常熟悉！':pct>=0.4?'😊 不錯喔，繼續加油！':'🍛 多吃幾次就會記住位置了！';
-  document.getElementById('final-score').textContent=`${totalScore} 分`;
-  document.getElementById('final-breakdown').textContent=`${successCount} / ${TOTAL_ROUNDS} 關成功（3公里內）`;
-  document.getElementById('final-msg').textContent=msg;
+function showFinal() {
+  const pct = totalScore / (TOTAL_ROUNDS * 1000);
+  const msg = pct >= 0.9 ? '🏆 你是雙醬咖哩的超級粉絲！' : pct >= 0.7 ? '👏 對台灣地理非常熟悉！' : pct >= 0.4 ? '😊 不錯喔，繼續加油！' : '🍛 多吃幾次就會記住位置了！';
+  document.getElementById('final-score').textContent = `${totalScore} 分`;
+  document.getElementById('final-breakdown').textContent = `${successCount} / ${TOTAL_ROUNDS} 關成功（3公里內）`;
+  document.getElementById('final-msg').textContent = msg;
   document.getElementById('final-overlay').classList.add('show');
 }
 
-function restartGame(){
+function restartGame() {
   document.getElementById('final-overlay').classList.remove('show');
   clearInterval(timerInterval);
-  currentRound=0;totalScore=0;successCount=0;
-  gameStores=shuffle(STORES).slice(0,TOTAL_ROUNDS);
-  if(guessMarker){guessMarker.setMap(null);guessMarker=null;}
-  if(answerMarker){answerMarker.setMap(null);answerMarker=null;}
-  if(polyline){polyline.setMap(null);polyline=null;}
-  if(infoWindow)infoWindow.close();
+  currentRound = 0; totalScore = 0; successCount = 0;
+  gameStores = shuffle(STORES).slice(0, TOTAL_ROUNDS);
+  if(guessMarker) { guessMarker.setMap(null); guessMarker = null; }
+  if(answerMarker) { answerMarker.setMap(null); answerMarker = null; }
+  if(polyline) { polyline.setMap(null); polyline = null; }
+  if(infoWindow) infoWindow.close();
   loadRound();
 }
 </script>
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAo6pRK4R9R1GRrq3smv6PbICQde-frmSs&libraries=geometry&callback=Function.prototype" async defer></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAo6pRK4R9R1GRrq3smv6PbICQde-frmSs&callback=Function.prototype" async defer></script>
 </body>
 </html>
