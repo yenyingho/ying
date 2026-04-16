@@ -96,7 +96,8 @@
   #map-container { flex: 1; position: relative; }
   #map { width: 100%; height: 100%; }
   #guess-btn-wrap {
-    position: absolute; bottom: 20px; left: 20px; z-index: 500;
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    z-index: 500; white-space: nowrap;
   }
 
   #result-overlay {
@@ -151,7 +152,7 @@
   <div style="font-size:3em">🍛</div>
   <h1>台灣雙醬咖哩<br>藏飽圖</h1>
   <p>59 間門市藏在台灣各地<br>看街景猜位置，3公里內算成功！</p>
-  <div style="color:#888;font-size:0.85em">共 3 關・每關限時 45 秒・最高 1000 分</div>
+  <div style="color:#888;font-size:0.85em">共 3 關・每關限時 30 秒・最高 1000 分</div>
   <button class="btn" onclick="startGame()">開始挑戰 🗺️</button>
 </div>
 
@@ -160,7 +161,7 @@
     <h2>🍛 雙醬咖哩藏飽圖</h2>
     <div id="timer-wrap">
       <span style="font-size:0.75em;color:#aaa">⏱</span>
-      <div id="timer-num">0:45</div>
+      <div id="timer-num">0:30</div>
       <div id="timer-bar-wrap"><div id="timer-bar" style="width:100%"></div></div>
     </div>
     <div id="score-display">
@@ -221,13 +222,16 @@
     <div id="final-score"></div>
     <div id="final-breakdown"></div>
     <div id="final-msg"></div>
-    <button class="btn" onclick="restartGame()">再玩一次 🔄</button>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:4px">
+      <button class="btn" onclick="restartGame()">再玩一次 🔄</button>
+      <button class="btn" style="background:transparent;border:2px solid #f5a623;color:#f5a623;box-shadow:none" onclick="goHome()">回到首頁 🏠</button>
+    </div>
   </div>
 </div>
 
 <script>
 const TOTAL_ROUNDS = 3;
-const TIME_LIMIT = 45;
+const TIME_LIMIT = 30;
 
 const STORES = [
   {name:"雙醬咖哩-吳鳳店",city:"嘉義市",lat:23.4583734042461,lng:120.458592476427,url:"https://maps.app.goo.gl/c3S3uHsqRvAT3EjG7",embed:"https://www.google.com/maps/embed?pb=!4v1775400402696!6m8!1m7!1sJXyVfBiSRqTdXQINdkFyTA!2m2!1d23.45620069192082!2d120.4589296169698!3f72.41!4f0!5f0.7820865974627469"},
@@ -295,6 +299,17 @@ let gameStores=[], currentRound=0, totalScore=0, successCount=0;
 let selectedLatLng=null, map=null, infoWindow=null, guessMarker=null, answerMarker=null, polyline=null;
 let timerInterval=null, timeLeft=TIME_LIMIT, timedOut=false;
 
+function goHome() {
+  document.getElementById('final-overlay').classList.remove('show');
+  document.getElementById('game').classList.remove('active');
+  document.getElementById('splash').style.display = 'flex';
+  clearInterval(timerInterval);
+  if(guessMarker) { guessMarker.setMap(null); guessMarker = null; }
+  if(answerMarker) { answerMarker.setMap(null); answerMarker = null; }
+  if(polyline) { polyline.setMap(null); polyline = null; }
+  if(infoWindow) infoWindow.close();
+}
+
 function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 
 function loadStreetView(store) {
@@ -320,6 +335,7 @@ function initMap() {
     streetViewControl: false,
     fullscreenControl: false,
     mapTypeControl: false,
+    gestureHandling: 'greedy',
   });
   infoWindow = new google.maps.InfoWindow();
   map.addListener('click', (e) => onMapClick(e.latLng));
